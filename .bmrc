@@ -1,0 +1,40 @@
+export BMPATH=${HOME}/.bm
+
+# bm is adapted from jeroenjanssens.com http://goo.gl/0uRAHz
+
+function bmc { # bm cd
+  cd -P "${BMPATH}/${1}" 2> /dev/null || echo "No such bm: '${1}'"
+}
+
+function bm { # bookmark
+  [[ ! -d ${BMPATH} ]] && mkdir -vp "${BMPATH}"
+  local t="${1:-$(basename ${PWD})}"
+  ln -s "${PWD}" "${BMPATH}/${t}"
+  bml | grep "^${t} " | column -t
+}
+
+function bmr { # bm rm
+  if [[ ${#:-0} -eq 0 ]]; then
+    echo "# ${FUNCNAME} requires an argument" 1>&2
+    return 1
+  fi
+  rm -v "${BMPATH}/${1}"
+}
+
+function bml { # bm ls
+  # TODO: don't parse output of ls
+  ( ls -l "${BMPATH}" | sed 's/  / /g;s/^$//g' | awk '{print $9,$10,$11}' | column -t ) 2> /dev/null
+}
+
+_completebms() {
+  local word=${COMP_WORDS[COMP_CWORD]}
+  local list=$(find "${BMPATH}" -type l -printf "%f\n")
+  COMPREPLY=($(compgen -W '${list[@]}' -- "${word}"))
+  return 0
+}
+
+bmu() {
+  . ${BMPATH}/.bmrc
+}
+
+complete -F _completebms bmc bmr
