@@ -8,7 +8,7 @@ function bmc { # bm cd
 
 function bm { # bookmark
   [[ ! -d ${BMPATH} ]] && mkdir -vp "${BMPATH}"
-  local t="${1:-$(basename ${PWD})}"
+  local t="${1:-$(basename "${PWD}")}"
   ln -s "${PWD}" "${BMPATH}/${t}"
   bml | grep "^${t} " | column -t
 }
@@ -28,7 +28,7 @@ function bml { # bm ls
 
 _completebms() {
   local word=${COMP_WORDS[COMP_CWORD]}
-  local list=$(find "${BMPATH}" -type l -printf "%f\n")
+  local list=$(find "${BMPATH}/" -type l -printf "%f\n")
   COMPREPLY=($(compgen -W '${list[@]}' -- "${word}"))
   return 0
 }
