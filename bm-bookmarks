@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# bm-bookmarks was originally adapted from jeroenjanssens.com http://goo.gl/0uRAHz
+
+[[ -z "${BMPATH:-}" ]] && export BMPATH="${HOME}/.config/bm-bookmarks"
+
+bmc() { # bm cd
+  cd -P "${BMPATH}/${1:?${FUNCNAME[0]} requires an argument}" ||
+    return ${LINENO}
+}
+
+bm() { # bm a.k.a. bm create
+  [[ ! -d ${BMPATH} ]] && mkdir -vp "${BMPATH}"
+  local -- bm_name full_path
+  bm_name="${1:-$(basename "${PWD}")}"
+  full_path="${BMPATH}/${bm_name}"
+  # one-letter BMs are ephemeral by design
+  [[ ${#bm_name} -eq 1 && -L "${full_path}" ]] && rm "${full_path}"
+  ln -s "${PWD}" "${full_path}"
+  bml "${bm_name}"
+}
+
+bmr() { # bm rm
+  rm -v "${BMPATH}/${1:?${FUNCNAME[0]} requires an argument}"
+}
+
+bml() { # bm ls
+  local -- item list
+  [[ ${#} -eq 1 ]] &&
+    list="${BMPATH}/${1}" ||
+      list="$(find "${BMPATH}/" -type l)"
+  for item in ${list}; do
+    echo "${item##*/} -> $(readlink -f "${item}")"
+  done | sort | column -t
+}
+
+_bm_completion() {
+  local -a list
+  # single quotes don't work for the printf argument
+  mapfile -t list < <(find "${BMPATH}/" -type l -printf "%f\\n")
+  mapfile -t COMPREPLY < <(compgen -W "${list[*]}" -- "${COMP_WORDS[COMP_CWORD]}")
+}
+
+complete -F _bm_completion bmc bmr
+
+#
