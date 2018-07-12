@@ -1,40 +1,46 @@
-export BMPATH=${HOME}/.bm
+#!/bin/bash
 
-# bm is adapted from jeroenjanssens.com http://goo.gl/0uRAHz
+# bm-bookmarks was originally adapted from jeroenjanssens.com http://goo.gl/0uRAHz
 
-function bmc { # bm cd
-  cd -P "${BMPATH}/${1}" 2> /dev/null || echo "No such bm: '${1}'"
+[[ -z "${BMPATH:-}" ]] && export BMPATH="${HOME}/.config/bm-bookmarks"
+
+bmc() { # bm cd
+  cd -P "${BMPATH}/${1:?${FUNCNAME[0]} requires an argument}" ||
+    return ${LINENO}
 }
 
-function bm { # bookmark
+bm() { # bm a.k.a. bm create
   [[ ! -d ${BMPATH} ]] && mkdir -vp "${BMPATH}"
-  local t="${1:-$(basename "${PWD}")}"
-  ln -s "${PWD}" "${BMPATH}/${t}"
-  bml | grep "^${t} " | column -t
+  local -- bm_name full_path
+  bm_name="${1:-$(basename "${PWD}")}"
+  full_path="${BMPATH}/${bm_name}"
+  # one-letter BMs are ephemeral by design
+  [[ ${#bm_name} -eq 1 && -L "${full_path}" ]] && rm "${full_path}"
+  ln -s "${PWD}" "${full_path}"
+  bml "${bm_name}"
 }
 
-function bmr { # bm rm
-  if [[ ${#:-0} -eq 0 ]]; then
-    echo "# ${FUNCNAME} requires an argument" 1>&2
-    return 1
-  fi
-  rm -v "${BMPATH}/${1}"
+bmr() { # bm rm
+  rm -v "${BMPATH}/${1:?${FUNCNAME[0]} requires an argument}"
 }
 
-function bml { # bm ls
-  # TODO: don't parse output of ls
-  ( ls -l "${BMPATH}" | sed 's/  / /g;s/^$//g' | awk '{print $9,$10,$11}' | column -t ) 2> /dev/null
+bml() { # bm ls
+  local -- item list
+  [[ ${#} -eq 1 ]] &&
+    list="${BMPATH}/${1}" ||
+      list="$(find "${BMPATH}/" -type l)"
+  for item in ${list}; do
+    echo "${item##*/} -> $(readlink -f "${item}")"
+  done | sort | column -t
 }
 
-_completebms() {
-  local word=${COMP_WORDS[COMP_CWORD]}
-  local list=$(find "${BMPATH}/" -type l -printf "%f\n")
-  COMPREPLY=($(compgen -W '${list[@]}' -- "${word}"))
-  return 0
+_bm_completion() {
+  local -a list
+  # single quotes don't work for the printf argument
+  mapfile -t list < <(find "${BMPATH}/" -type l -printf "%f\\n")
+  mapfile -t COMPREPLY < <(compgen -W "${list[*]}" -- "${COMP_WORDS[COMP_CWORD]}")
 }
 
-bmu() {
-  . ${BMPATH}/.bmrc
-}
+complete -F _bm_completion bmc bmr
 
-complete -F _completebms bmc bmr
+#
