@@ -21,7 +21,7 @@ bmc() { # bm cd
   local -- link_name link_target
   link_name="${BMPATH}/${1:?bmc-1-link_name}"
   [[ ! -L "${link_name}" ]] && _bm_error link not found && return ${LINENO}
-  link_target="$( readlink -f "${1}" )"
+  link_target="$( readlink -f "${link_name}" )"
   [[ ! -d "${link_target}" ]] && _bm_error broken link && return ${LINENO}
   cd -P "${BMPATH}/${1:?${FUNCNAME[0]} requires an argument}" ||
     return ${LINENO}
