@@ -8,6 +8,15 @@ _bm_error() {
   echo "bm-bookmarks error: ${*}" 1>&2
 }
 
+bm-audit() {
+  local -- link
+  local -a links
+  readarray -t links < <(find "${BMPATH}/" -type l)
+  for link in "${links[@]}"; do
+    [[ -d "$(readlink -f "${link}" )" ]] || 'ls' -alFh "${link}"
+  done
+}
+
 bmc() { # bm cd
   local -- link_name link_target
   link_name="${BMPATH}/${1:?bmc-1-link_name}"
