@@ -43,12 +43,14 @@ bmr() { # bm rm
 }
 
 bml() { # bm ls
-  local -- item list
-  [[ ${#} -eq 1 ]] &&
-    list="${BMPATH}/${1}" ||
-      list="$(find "${BMPATH}/" -type l)"
-  for item in ${list}; do
-    echo "${item##*/} -> $(readlink -f "${item}")"
+  local -- item
+  local -a list
+  # shellcheck disable=SC2015
+  [[ ${#} -gt 0 ]] &&
+    list=("${@}") ||
+    readarray -t list < <(find "${BMPATH}" -maxdepth 1 -type l)
+  for item in "${list[@]}"; do
+    echo "${item##*/} -> $(realpath "${item}")"
   done | sort | column -t
 }
 
@@ -59,6 +61,6 @@ _bm_completion() {
   mapfile -t COMPREPLY < <(compgen -W "${list[*]}" -- "${COMP_WORDS[COMP_CWORD]}")
 }
 
-complete -F _bm_completion bmc bmr
+complete -F _bm_completion bmc bml bmr
 
 #
