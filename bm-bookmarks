@@ -50,8 +50,18 @@ bml() { # bm ls
     list=("${@}") ||
     readarray -t list < <(find "${BMPATH}" -maxdepth 1 -type l)
   for item in "${list[@]}"; do
-    echo "${item##*/} -> $(realpath "${item}")"
+    # test
+    [[ -L "${BMPATH}/${item}" || -L "${item}" ]] &&
+      echo "${item##*/} -> $(realpath "${item}")"
   done | sort | column -t
+}
+
+bmu() {
+  local -- bm="${1:-"$(basename "${PWD}")"}"
+  if bml "${bm}" 1>/dev/null; then
+    bmr "${bm}"
+    bm "${bm}"
+  fi
 }
 
 _bm_completion() {
