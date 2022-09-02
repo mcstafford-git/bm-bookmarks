@@ -2,19 +2,48 @@
 
 # bm-bookmarks was originally adapted from jeroenjanssens.com http://goo.gl/0uRAHz
 
-[[ -z "${BMPATH:-}" ]] && export BMPATH="${HOME}/.config/bm-bookmarks"
+[[ -z "${BMPATH:-}" ]] &&
+  export BMPATH="${XDG_CONFIG_HOME:-${HOME}/.config}/bm-bookmarks"
+
+_bm_completion() {
+  local -- word="${COMP_WORDS[COMP_CWORD]}"
+  local -a list
+  # single quotes don't work for the printf argument
+  readarray -t list < <(
+    find "${BMPATH}/" -type l -printf "%f\\n"
+  )
+  readarray -t COMPREPLY < <(
+    compgen -W "${list[*]}" -- "${word}"
+  )
+}
 
 _bm_error() {
   echo "bm-bookmarks error: ${*}" 1>&2
 }
 
-bm-audit() {
-  local -- link
+bma() { # bm audit
+  local -- link target
   local -a links
   readarray -t links < <(find "${BMPATH}/" -type l)
   for link in "${links[@]}"; do
-    [[ -d "$(readlink -f "${link}" )" ]] || 'ls' -alFh "${link}"
+    read -r target < <(
+      readlink -f "${link}"
+    )
+    if [[ ! -d "${target}" ]]; then
+      printf '%s -> %s\n' "${link##*/}" "$(tilde "${target}")"
+    fi
   done
+}
+
+bm() { # bm a.k.a. bm create
+  [[ ! -d ${BMPATH} ]] && mkdir -vp "${BMPATH}"
+  local -- bm_name full_path
+  bm_name="${1:-${PWD##*/}}"
+  full_path="${BMPATH}/${bm_name}"
+  # one-letter BMs are ephemeral by design
+  [[ ${#bm_name} -eq 1 && -L "${full_path}" ]] && rm "${full_path}"
+  ln -s "${PWD}" "${full_path}"
+  bml "${bm_name}"
 }
 
 bmc() { # bm cd
@@ -29,21 +58,6 @@ bmc() { # bm cd
     return ${LINENO}
 }
 
-bm() { # bm a.k.a. bm create
-  [[ ! -d ${BMPATH} ]] && mkdir -vp "${BMPATH}"
-  local -- bm_name full_path
-  bm_name="${1:-$(basename "${PWD}")}"
-  full_path="${BMPATH}/${bm_name}"
-  # one-letter BMs are ephemeral by design
-  [[ ${#bm_name} -eq 1 && -L "${full_path}" ]] && rm "${full_path}"
-  ln -s "${PWD}" "${full_path}"
-  bml "${bm_name}"
-}
-
-bmr() { # bm rm
-  rm -v "${BMPATH}/${1:?${FUNCNAME[0]} requires an argument}"
-}
-
 bml() { # bm ls
   local -- item
   local -a list
@@ -52,27 +66,33 @@ bml() { # bm ls
     list=("${@}") ||
     readarray -t list < <(find "${BMPATH}" -maxdepth 1 -type l)
   for item in "${list[@]}"; do
-    # test
-    [[ -L "${BMPATH}/${item}" || -L "${item}" ]] &&
-      echo "${item##*/} -> $(realpath "${item}")"
+    if [[ -L "${BMPATH}/${item}" ]]; then
+      item="${BMPATH}/${item}"
+    fi
+    printf '%s -> %s\n' "${item##*/}" "$(tilde "$(realpath "${item}")")"
   done | sort | column -t
 }
 
-bmu() {
-  local -- bm="${1:-"$(basename "${PWD}")"}"
+bmr() { # bm rm
+  local -- link
+  [[ ${#} -eq 0 ]] && return ${LINENO}
+  printf 'Removing:\n%s\n' "$(bml "${@}")"
+  (
+    cd "${BMPATH}" || return ${LINENO}
+    for link in "${@}"; do
+      rm "${link##*/}" || return ${LINENO}
+    done
+  )
+}
+
+bmu() { # bm update
+  local -- bm="${1:-"${PWD##*/}"}"
   if bml "${bm}" 1>/dev/null; then
     bmr "${bm}"
     bm "${bm}"
   fi
 }
 
-_bm_completion() {
-  local -a list
-  # single quotes don't work for the printf argument
-  mapfile -t list < <(find "${BMPATH}/" -type l -printf "%f\\n")
-  mapfile -t COMPREPLY < <(compgen -W "${list[*]}" -- "${COMP_WORDS[COMP_CWORD]}")
-}
-
-complete -F _bm_completion bmc bml bmr
+complete -F _bm_completion bmc bml bmr bmu
 
 #
