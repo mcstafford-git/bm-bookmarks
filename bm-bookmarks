@@ -17,10 +17,6 @@ _bm_completion() {
   )
 }
 
-_bm_error() {
-  echo "bm-bookmarks error: ${*}" 1>&2
-}
-
 bma() { # bm audit
   local -- link target
   local -a links
@@ -43,7 +39,7 @@ bm() { # bm a.k.a. bm create
   # one-letter BMs are ephemeral by design
   [[ ${#bm_name} -eq 1 && -L "${full_path}" ]] && rm "${full_path}"
   ln -s "${PWD}" "${full_path}"
-  bml "${bm_name}"
+  BM_PREFIX=+ bml "${bm_name}"
 }
 
 bmc() { # bm cd
@@ -51,15 +47,20 @@ bmc() { # bm cd
   link_name="${1%%/*}"
   [[ "${1}" =~ / ]] && subdir="${1#*/}"
   link_name="${BMPATH}/${link_name}"
-  [[ ! -L "${link_name}" ]] && _bm_error link not found && return ${LINENO}
+  if [[ ! -L "${link_name}" ]]; then
+    echo "${FUNCNAME[0]} error: link not found" 1>&2 && return ${LINENO}
+  fi
   link_target="$( readlink -f "${link_name}" )"
-  [[ ! -d "${link_target}" ]] && _bm_error broken link && return ${LINENO}
-  cd "${link_target}/${subdir}" ||
-    return ${LINENO}
+  if [[ ! -d "${link_target}" ]]; then
+    echo "${FUNCNAME[0]} error: broken link, try bma" 1>&2 && return ${LINENO}
+  fi
+  if ! cd "${link_target}"; then
+    echo "${FUNCNAME[0]} error: cd failed" 1>&2 && return ${LINENO}
+  fi
 }
 
 bml() { # bm ls
-  local -- item
+  local -- prefix="${BM_PREFIX:-=}" item
   local -a list
   # shellcheck disable=SC2015
   [[ ${#} -gt 0 ]] &&
@@ -69,28 +70,28 @@ bml() { # bm ls
     if [[ -L "${BMPATH}/${item}" ]]; then
       item="${BMPATH}/${item}"
     fi
-    printf '%s -> %s\n' "${item##*/}" "$(tilde "$(realpath "${item}")")"
+    printf '%s %s -> %s\n' "${prefix}" "${item##*/}" "$(tilde "$(realpath "${item}")")"
   done | sort | column -t
 }
 
 bmr() { # bm rm
   local -- link
-  [[ ${#} -eq 0 ]] && return ${LINENO}
-  printf 'Removing:\n%s\n' "$(bml "${@}")"
+  if [[ ${#} -eq 0 ]]; then
+    echo "${FUNCNAME[0]} error: removal requires name(s)" 1>&2 && return ${LINENO}
+  fi
+  BM_PREFIX=- bml "${@}" || return ${?}
   (
-    cd "${BMPATH}" || return ${LINENO}
+    cd "${BMPATH}" &&
     for link in "${@}"; do
       rm "${link##*/}" || return ${LINENO}
     done
-  )
+  ) ||
+    echo "${FUNCNAME[0]} error: attempt failed" 1>&2 && return ${LINENO}
 }
 
 bmu() { # bm update
-  local -- bm="${1:-"${PWD##*/}"}"
-  if bml "${bm}" 1>/dev/null; then
-    bmr "${bm}"
-    bm "${bm}"
-  fi
+  bmr "${1}"
+  bm "${1}"
 }
 
 complete -F _bm_completion bmc bml bmr bmu
