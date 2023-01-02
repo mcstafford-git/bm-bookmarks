@@ -41,7 +41,14 @@ bm() { # bm a.k.a. bm create
 }
 
 bmr() { # bm rm
-  rm -v "${BMPATH}/${1:?${FUNCNAME[0]} requires an argument}"
+  (
+    cd "${BMPATH}" || return ${LINENO}
+    for bm in "${@}"; do
+      if bml "${bm}"; then
+        rm -v "${bm}" || return ${LINENO}
+      fi
+    done
+  )
 }
 
 bml() { # bm ls
