@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+clear
+set -xueo pipefail
+
+rnd() {
+  echo $(($(date +%s)*${RANDOM}))
+}
+
+if [[ -z "${TMP:-}" ]]; then
+  export TMP='/tmp'
+fi
+
+test -d "${TMP}"
+BASE_DIR="${TMP}/.bm-bookmarks-test.pid.${$}"
+
+BMPATH="${BASE_DIR}/bmks"
+cleanup() {
+  rm -vrf "${BASE_DIR}"
+}
+trap cleanup INT EXIT SIGQUIT SIGTERM
+DIRS="${BMPATH/bmk/dir}"
+mkdir -p "${BMPATH}" "${DIRS}"
+
+utf=$'\U0606\U0606\U0606'  # cube root char
+
+declare -a bases=(
+  "   -txt-txt"
+  "${utf}-txt-txt"
+  "000-txt-txt"
+  "aaa-txt-txt"
+  "txt-   -txt"
+  "txt-${utf}-txt"
+  "txt-000-txt"
+  "txt-aaa-txt"
+  "txt-txt-   "
+  "txt-txt-${utf}"
+  "txt-txt-000"
+  "txt-txt-aaa"
+)
+
+read -r cwd < <( dirname "${0}" )
+source "${cwd}/bm-bookmarks"
+declare -A permutations
+
+cd "${DIRS}"
+# declare -A permutations=(
+for i in {0..11}; do
+  read -r val < <(printf '%02d\n' "${i}")
+  key="${bases[${i}]}"
+  # declare -p key val
+
+  permutations["${key}"]="${val}"
+  permutations["${val}"]="${key}"
+  # echo "#=${#permutations[@]}"
+  declare -p permutations
+
+  for dir in "${!permutations[*]}"; do
+    (
+      direct="dir-${dir}"
+      alt="${direct/dir-/alt-}"
+      mkdir "${direct}"
+      cd "${direct}"
+
+      bm
+      bm "${alt}"
+
+      for opt in "${direct}" "${alt}"; do
+        bmr "${opt}"
+      done
+
+      bm
+      bm "${alt}"
+    )
+    break
+  done
+
+  break
+done
+bml
+

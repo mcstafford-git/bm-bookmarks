@@ -2,8 +2,9 @@
 
 # bm-bookmarks was originally adapted from jeroenjanssens.com http://goo.gl/0uRAHz
 
-[[ -z "${BMPATH:-}" ]] &&
+if [[ -z "${BMPATH:-}" ]]; then
   export BMPATH="${XDG_CONFIG_HOME:-${HOME}/.config}/bm-bookmarks"
+fi
 
 _bm_completion() {
   local -- word="${COMP_WORDS[COMP_CWORD]}"
@@ -92,6 +93,18 @@ bmr() { # bm rm
 bmu() { # bm update
   bmr "${1}"
   bm "${1}"
+}
+
+tilde() {
+  local -- path
+  (
+  export IFS=$'\n'
+  for path in "${@}"; do
+    [[ "${path}" =~ ${HOME} ]] &&
+      path="${path/${HOME//\//\\\/}/\~}"
+    echo "${path}"
+  done
+  )
 }
 
 complete -F _bm_completion bmc bml bmr bmu
