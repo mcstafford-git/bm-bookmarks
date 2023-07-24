@@ -34,13 +34,23 @@ bma() { # bm audit
 
 bm() { # bm a.k.a. bm create
   [[ ! -d ${BMPATH} ]] && mkdir -vp "${BMPATH}"
-  local -- bm_name full_path
-  bm_name="${1:-${PWD##*/}}"
-  full_path="${BMPATH}/${bm_name}"
-  # one-letter BMs are ephemeral by design
-  [[ ${#bm_name} -eq 1 && -L "${full_path}" ]] && rm "${full_path}"
-  ln -s "${PWD}" "${full_path}"
-  BM_PREFIX=+ bml "${bm_name}"
+  local -- link path="${PWD}" dirname tilde="${BMPATH}/~"
+  dirname="${1:-${PWD##*/}}"
+  link="${BMPATH}/${dirname}"
+  # if path is below home and tilde link exists then use it
+  if [[ "${path}" =~ ${HOME} && -L "${tilde}" ]]; then
+    (
+      # make symlinks a bit more portable, having a single source for home
+      cd "${BMPATH}" &&
+        read -r path < <(
+          printf './~/%s\n' "${path/${HOME}\//}"
+        ) &&
+        ln -s "${path}" "${dirname}"
+    )
+  else
+    ln -s "${path}" "${link}"
+  fi
+  BM_PREFIX=+ bml "${dirname}"
 }
 
 bmc() { # bm cd
