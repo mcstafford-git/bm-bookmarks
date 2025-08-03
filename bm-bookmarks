@@ -11,7 +11,8 @@ _bm_completion() {
   local -a list
   # single quotes don't work for the printf argument
   readarray -t list < <(
-    find "${BMPATH}/" -type l -printf "%f\\n"
+    # find "${BMPATH}/" -type l -printf "%f\\n"
+    find "${BMPATH}/" -type l -exec basename {} ';'
   )
   readarray -t COMPREPLY < <(
     compgen -W "${list[*]}" -- "${word}"
